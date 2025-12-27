@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # NAPKIN Landing Page
 
 A premium, motion-driven landing page for NAPKIN — an AI product that transforms hand-drawn sketches into production-ready UI.
@@ -40,3 +41,6 @@ Strictly black & white:
 - Primary text: #FFFFFF
 - Secondary text: rgba(255,255,255,0.65)
 - Borders: rgba(255,255,255,0.08)
+=======
+# napkinAI
+>>>>>>> cc49089c39429e8871854dd92f97ce3876cde13f
