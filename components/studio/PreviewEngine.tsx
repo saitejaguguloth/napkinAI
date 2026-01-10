@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 
 interface GeneratedFile {
   path: string;
@@ -23,7 +23,13 @@ export default function PreviewEngine({
   generatedCode,
   isGenerating
 }: PreviewEngineProps) {
-  const html = generatePreviewHTML(files, techStack, previewHtml, generatedCode);
+  // Generate HTML and create a stable key for the iframe
+  const { html, iframeKey } = useMemo(() => {
+    const generatedHtml = generatePreviewHTML(files, techStack, previewHtml, generatedCode);
+    // Use a simple hash of the first 100 chars + length as key
+    const key = `preview-${generatedHtml.length}-${generatedHtml.slice(0, 100).split('').reduce((a, b) => a + b.charCodeAt(0), 0)}`;
+    return { html: generatedHtml, iframeKey: key };
+  }, [files, techStack, previewHtml, generatedCode]);
 
   return (
     <div className="w-full h-full bg-white rounded-lg overflow-hidden relative">
@@ -33,6 +39,7 @@ export default function PreviewEngine({
         </div>
       )}
       <iframe
+        key={iframeKey}
         title="Preview"
         className="w-full h-full border-none"
         srcDoc={html}
