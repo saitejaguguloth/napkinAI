@@ -337,16 +337,44 @@ function wrapReactCode(code: string): string {
     cleanCode = cleanCode.replace(/^import\s+['"][^'"]+['"];?\s*$/gm, '');
     cleanCode = cleanCode.split('\n').filter(line => !line.trim().startsWith('import ')).join('\n');
 
-    // Handle export patterns
+    // Handle export patterns - BEFORE finding component name
     cleanCode = cleanCode.replace(/export\s+default\s+function\s+(\w+)/g, 'function $1');
     cleanCode = cleanCode.replace(/export\s+default\s+/g, '');
     cleanCode = cleanCode.replace(/export\s+function\s+(\w+)/g, 'function $1');
     cleanCode = cleanCode.replace(/export\s+const\s+/g, 'const ');
 
-    // Find component name
-    const funcMatch = cleanCode.match(/function\s+([A-Z]\w*)\s*\(/);
-    const arrowMatch = cleanCode.match(/const\s+([A-Z]\w*)\s*=\s*\(/);
-    const componentName = funcMatch?.[1] || arrowMatch?.[1] || 'App';
+    // Find component name with multiple patterns
+    let componentName = 'App';
+
+    // Pattern 1: function ComponentName()
+    const funcMatch = cleanCode.match(/function\s+([A-Z][a-zA-Z0-9]*)\s*\(/);
+    if (funcMatch?.[1]) {
+        componentName = funcMatch[1];
+    }
+
+    // Pattern 2: const ComponentName = () =>
+    if (componentName === 'App') {
+        const arrowMatch = cleanCode.match(/const\s+([A-Z][a-zA-Z0-9]*)\s*=\s*\(/);
+        if (arrowMatch?.[1]) {
+            componentName = arrowMatch[1];
+        }
+    }
+
+    // Pattern 3: const ComponentName = function
+    if (componentName === 'App') {
+        const funcExprMatch = cleanCode.match(/const\s+([A-Z][a-zA-Z0-9]*)\s*=\s*function/);
+        if (funcExprMatch?.[1]) {
+            componentName = funcExprMatch[1];
+        }
+    }
+
+    // Pattern 4: Look for any function starting with uppercase
+    if (componentName === 'App') {
+        const anyFuncMatch = cleanCode.match(/(?:function|const)\s+([A-Z]\w*)/);
+        if (anyFuncMatch?.[1]) {
+            componentName = anyFuncMatch[1];
+        }
+    }
 
     // Escape backticks and backslashes in the code for template literal
     const escapedCode = cleanCode.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
@@ -372,7 +400,6 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
     font-size: 13px;
     border-bottom: 2px solid #F87171;
     white-space: pre-wrap;
-    word-break: break-word;
 }
 .preview-loading {
     position: fixed;
@@ -383,11 +410,9 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
     align-items: center;
     justify-content: center;
     color: #71717A;
-    font-family: system-ui;
 }
 .spinner {
-    width: 32px;
-    height: 32px;
+    width: 32px; height: 32px;
     border: 3px solid #333;
     border-top-color: #666;
     border-radius: 50%;
@@ -409,11 +434,7 @@ window.addEventListener('load', function() {
     var root = document.getElementById('root');
     
     if (typeof React === 'undefined') {
-        root.innerHTML = '<div class="preview-error">Failed to load React. Check your internet connection.</div>';
-        return;
-    }
-    if (typeof ReactDOM === 'undefined') {
-        root.innerHTML = '<div class="preview-error">Failed to load ReactDOM.</div>';
+        root.innerHTML = '<div class="preview-error">Failed to load React.</div>';
         return;
     }
     if (typeof Babel === 'undefined') {
@@ -423,6 +444,7 @@ window.addEventListener('load', function() {
     
     root.innerHTML = '<div class="preview-loading"><div class="spinner"></div><div>Compiling JSX...</div></div>';
     
+    // React hooks
     var useState = React.useState;
     var useEffect = React.useEffect;
     var useRef = React.useRef;
@@ -436,37 +458,48 @@ window.addEventListener('load', function() {
     var useLayoutEffect = React.useLayoutEffect;
     var forwardRef = React.forwardRef;
     
-    var Link = function(props) {
+    // Mock Next.js components
+    function Link(props) {
         return React.createElement('a', Object.assign({}, props, { href: props.href || '#' }), props.children);
-    };
-    var Image = function(props) {
+    }
+    function Image(props) {
         return React.createElement('img', Object.assign({}, props, { loading: 'lazy' }));
-    };
+    }
     
-    var jsxCode = \`${escapedCode}\`;
+    var componentName = '${componentName}';
+    console.log('Looking for component:', componentName);
+    
+    var jsxCode = ${JSON.stringify(cleanCode)};
+    console.log('Code to transform:', jsxCode.substring(0, 200) + '...');
     
     try {
-        var transformed = Babel.transform(jsxCode + '\\nwindow.__COMPONENT__ = ${componentName};', {
+        var codeWithExport = jsxCode + '\\nwindow.__COMPONENT__ = ' + componentName + ';';
+        console.log('Transforming with Babel...');
+        
+        var transformed = Babel.transform(codeWithExport, {
             presets: ['react'],
             filename: 'preview.jsx'
         });
         
-        root.innerHTML = '<div class="preview-loading"><div class="spinner"></div><div>Mounting component...</div></div>';
+        console.log('Babel transform successful');
+        root.innerHTML = '<div class="preview-loading"><div class="spinner"></div><div>Mounting...</div></div>';
         
         eval(transformed.code);
         
         var Component = window.__COMPONENT__;
+        console.log('Component found:', typeof Component);
+        
         if (!Component) {
-            throw new Error('Component "${componentName}" was not found.');
+            throw new Error('Component "' + componentName + '" not found. The component must be a function.');
         }
         
         root.innerHTML = '';
-        var reactRoot = ReactDOM.createRoot(root);
-        reactRoot.render(React.createElement(Component));
+        ReactDOM.createRoot(root).render(React.createElement(Component));
+        console.log('Render complete!');
         
     } catch (error) {
         console.error('Preview Error:', error);
-        root.innerHTML = '<div class="preview-error">Error: ' + (error.message || 'Unknown error') + '</div>';
+        root.innerHTML = '<div class="preview-error">Error: ' + error.message + '</div>';
     }
 });
 </script>
