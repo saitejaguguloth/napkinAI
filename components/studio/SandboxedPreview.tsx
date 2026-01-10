@@ -59,15 +59,17 @@ function injectVirtualRouter(html: string, pages: { name: string }[]): string {
         const target = e.target.closest('a, button, [data-navigate]');
         if (!target) return;
         
+        // Always prevent default for all clicks
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
         // Check for navigation attribute
         const navigateTo = target.getAttribute('data-navigate') || 
                            target.getAttribute('href');
         
         if (navigateTo) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Handle internal navigation
+            // Handle internal navigation only
             if (navigateTo.startsWith('#') || navigateTo.startsWith('/') || PAGES.includes(navigateTo.replace('/', ''))) {
                 const pageName = navigateTo.replace(/^[#/]/, '');
                 if (PAGES.includes(pageName)) {
@@ -85,12 +87,14 @@ function injectVirtualRouter(html: string, pages: { name: string }[]): string {
             if (target.tagName === 'BUTTON' || target.getAttribute('type') === 'submit') {
                 mockButtonAction(target);
             }
+        } else {
+            // Handle buttons without href
+            if (target.tagName === 'BUTTON') {
+                mockButtonAction(target);
+            }
         }
         
-        // Always prevent anchor navigation
-        if (target.tagName === 'A') {
-            e.preventDefault();
-        }
+        return false;
     }, true);
     
     // Mock button interactions
@@ -329,8 +333,9 @@ export default function SandboxedPreview({
                                 ref={iframeRef}
                                 srcDoc={getPreviewHtml()}
                                 className="w-full h-full border-0"
-                                sandbox="allow-scripts"
+                                sandbox="allow-scripts allow-same-origin"
                                 title="Preview"
+                                style={{ pointerEvents: 'auto' }}
                             />
                         )}
                     </motion.div>

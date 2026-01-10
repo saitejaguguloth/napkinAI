@@ -29,6 +29,10 @@ export default function VoiceInput({ onCommand, isProcessing, disabled }: VoiceI
         setIsSupported(isSpeechRecognitionSupported());
     }, []);
 
+    // Track latest transcript values for the onEnd callback
+    const latestTranscriptRef = useRef("");
+    const latestInterimRef = useRef("");
+
     // Create recognition instance
     const startListening = useCallback(() => {
         if (disabled || isProcessing) return;
@@ -36,46 +40,58 @@ export default function VoiceInput({ onCommand, isProcessing, disabled }: VoiceI
         setError(null);
         setTranscript("");
         setInterimTranscript("");
+        latestTranscriptRef.current = "";
+        latestInterimRef.current = "";
 
         recognitionRef.current = new VoiceRecognition({
             language: 'en-US',
-            continuous: false,
+            continuous: true, // Keep listening for longer
             interimResults: true,
             onResult: (text, isFinal) => {
                 if (isFinal) {
                     setTranscript(text);
                     setInterimTranscript("");
+                    latestTranscriptRef.current = text;
+                    latestInterimRef.current = "";
                 } else {
                     setInterimTranscript(text);
+                    latestInterimRef.current = text;
                 }
             },
             onStart: () => {
                 setIsListening(true);
+                setError(null);
             },
             onEnd: () => {
                 setIsListening(false);
-                // If we have a final transcript, send it
-                if (recognitionRef.current) {
-                    const finalText = transcript || interimTranscript;
-                    if (finalText.trim()) {
-                        onCommand(finalText.trim());
-                    }
+                // Use refs for latest values (avoid stale closure)
+                const finalText = latestTranscriptRef.current || latestInterimRef.current;
+                if (finalText.trim()) {
+                    onCommand(finalText.trim());
+                } else {
+                    setError('No speech detected. Try again.');
                 }
             },
             onError: (err) => {
                 setIsListening(false);
                 if (err === 'not-allowed') {
-                    setError('Microphone access denied. Please allow microphone access.');
+                    setError('Microphone access denied. Please allow microphone access in your browser settings.');
                 } else if (err === 'no-speech') {
                     setError('No speech detected. Try again.');
+                } else if (err === 'aborted') {
+                    // User stopped - not an error
+                    const finalText = latestTranscriptRef.current || latestInterimRef.current;
+                    if (finalText.trim()) {
+                        onCommand(finalText.trim());
+                    }
                 } else {
-                    setError(`Error: ${err}`);
+                    setError(`Speech error: ${err}. Try again.`);
                 }
             }
         });
 
         recognitionRef.current.start();
-    }, [disabled, isProcessing, onCommand, transcript, interimTranscript]);
+    }, [disabled, isProcessing, onCommand]);
 
     // Stop listening
     const stopListening = useCallback(() => {
@@ -133,7 +149,7 @@ export default function VoiceInput({ onCommand, isProcessing, disabled }: VoiceI
                         transition-all duration-300 
                         ${isListening
                             ? 'bg-red-500 shadow-lg shadow-red-500/30'
-                            : 'bg-gradient-to-br from-blue-500 to-purple-600 hover:shadow-lg hover:shadow-blue-500/30'
+                            : 'bg-white hover:bg-white/90 hover:shadow-lg hover:shadow-white/20'
                         }
                         ${(disabled || isProcessing) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                     `}
@@ -158,7 +174,7 @@ export default function VoiceInput({ onCommand, isProcessing, disabled }: VoiceI
 
                     {/* Mic icon */}
                     <svg
-                        className="w-7 h-7 text-white relative z-10"
+                        className={`w-7 h-7 relative z-10 ${isListening ? 'text-white' : 'text-black'}`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -184,14 +200,14 @@ export default function VoiceInput({ onCommand, isProcessing, disabled }: VoiceI
                 </p>
             </div>
 
-            {/* Live transcript */}
+            {/* Live transcript - Real-time streaming */}
             <AnimatePresence>
                 {(isListening || interimTranscript || transcript) && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="p-3 bg-white/5 rounded-xl border border-white/10"
+                        className="p-4 bg-white/5 rounded-xl border border-white/10 min-h-[80px]"
                     >
                         <div className="flex items-start gap-2">
                             {isListening && (
@@ -202,9 +218,17 @@ export default function VoiceInput({ onCommand, isProcessing, disabled }: VoiceI
                                 />
                             )}
                             <div className="flex-1">
-                                <p className="text-sm text-white/80">
-                                    {transcript || interimTranscript || (
-                                        <span className="text-white/40 italic">Listening...</span>
+                                <p className="text-xs text-white/40 uppercase tracking-wider mb-1.5">
+                                    {isListening ? '🎤 Listening...' : 'Transcript'}
+                                </p>
+                                <p className="text-sm leading-relaxed">
+                                    {/* Final transcript in white */}
+                                    <span className="text-white/90">{transcript}</span>
+                                    {/* Interim transcript in blue/italic - shows real-time */}
+                                    <span className="text-blue-400/80 italic"> {interimTranscript}</span>
+                                    {/* Placeholder when no speech yet */}
+                                    {!transcript && !interimTranscript && (
+                                        <span className="text-white/30 italic">Start speaking...</span>
                                     )}
                                 </p>
                             </div>

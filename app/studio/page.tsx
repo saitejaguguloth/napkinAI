@@ -203,8 +203,68 @@ export default function StudioPage() {
         }
     };
 
-    // Start analysis
+    // Start analysis (supports both sketch and text modes)
     const handleStartAnalysis = async () => {
+        // For text mode, we don't need uploaded pages
+        if (inputType === "text") {
+            if (!textPrompt || textPrompt.trim().length < 10) return;
+            
+            setFlowState("analyzing");
+            setErrorMessage("");
+            
+            // For text mode, create a mock analysis based on the prompt
+            try {
+                // Analyze the text prompt to determine page structure
+                const promptLower = textPrompt.toLowerCase();
+                let pageType = "landing";
+                let sections = ["hero", "features", "footer"];
+                let navigation = "topnav";
+                
+                // Detect page type from prompt
+                if (promptLower.includes("dashboard")) {
+                    pageType = "dashboard";
+                    sections = ["sidebar", "header", "stats", "charts", "table"];
+                    navigation = "sidebar";
+                } else if (promptLower.includes("ecommerce") || promptLower.includes("product") || promptLower.includes("shop")) {
+                    pageType = "ecommerce";
+                    sections = ["header", "hero", "products", "categories", "footer"];
+                } else if (promptLower.includes("blog") || promptLower.includes("article")) {
+                    pageType = "blog";
+                    sections = ["header", "featured", "articles", "sidebar", "footer"];
+                } else if (promptLower.includes("login") || promptLower.includes("signup") || promptLower.includes("auth")) {
+                    pageType = "form";
+                    sections = ["auth-form"];
+                    navigation = "none";
+                } else if (promptLower.includes("portfolio")) {
+                    pageType = "portfolio";
+                    sections = ["hero", "projects", "about", "contact", "footer"];
+                } else if (promptLower.includes("pricing")) {
+                    pageType = "landing";
+                    sections = ["hero", "pricing", "features", "faq", "footer"];
+                }
+                
+                setLayoutAnalysis({
+                    pageType,
+                    sections,
+                    structure: `${pageType} layout based on description`,
+                    navigation,
+                    components: sections,
+                });
+                setFlowState("analyzed");
+            } catch {
+                setLayoutAnalysis({
+                    pageType: "landing",
+                    sections: ["Header", "Main Content", "Footer"],
+                    structure: "Layout detected",
+                    navigation: "topnav",
+                    components: ["Navigation", "Content"],
+                });
+                setFlowState("analyzed");
+            }
+            return;
+        }
+        
+        // For sketch mode, require uploaded pages
         if (uploadedPages.length === 0) return;
 
         setFlowState("analyzing");
@@ -250,6 +310,8 @@ export default function StudioPage() {
                         navType: config.navType,
                         pageFlowInstructions: pageFlowInstructions,
                         pages: uploadedPages.map(p => ({ name: p.name, role: p.role })),
+                        // Include text prompt for text-to-website generation
+                        textPrompt: inputType === "text" ? textPrompt : undefined,
                     }
                 }),
             });
@@ -344,9 +406,19 @@ export default function StudioPage() {
         }
     };
 
-    // Handle modification via chat
+    // Handle modification via chat or voice
     const handleModify = async (command: string) => {
         if (!studioConfig || !generatedCode) return;
+        
+        // Add user message to history
+        const userMessage: ModifyMessage = {
+            id: Date.now().toString(),
+            type: "user",
+            content: command,
+            timestamp: new Date(),
+        };
+        setModificationHistory(prev => [...prev, userMessage]);
+        
         setIsModifying(true);
 
         try {
@@ -363,10 +435,36 @@ export default function StudioPage() {
 
             if (result.code) {
                 setGeneratedCode(result.code);
+                setPreviewHtml(result.code); // Update preview immediately
                 setLastSaved(new Date());
+                
+                // Add success message
+                const aiMessage: ModifyMessage = {
+                    id: (Date.now() + 1).toString(),
+                    type: "ai",
+                    content: "✓ Changes applied successfully",
+                    timestamp: new Date(),
+                };
+                setModificationHistory(prev => [...prev, aiMessage]);
+            } else if (result.error) {
+                // Add error message
+                const errorMessage: ModifyMessage = {
+                    id: (Date.now() + 1).toString(),
+                    type: "system",
+                    content: `Error: ${result.error}`,
+                    timestamp: new Date(),
+                };
+                setModificationHistory(prev => [...prev, errorMessage]);
             }
         } catch (err) {
             console.error("Modify error:", err);
+            const errorMessage: ModifyMessage = {
+                id: (Date.now() + 1).toString(),
+                type: "system",
+                content: "Failed to apply changes. Please try again.",
+                timestamp: new Date(),
+            };
+            setModificationHistory(prev => [...prev, errorMessage]);
         } finally {
             setIsModifying(false);
         }
@@ -471,6 +569,30 @@ export default function StudioPage() {
                     </div>
                     {lastSaved && (
                         <span className="text-xs text-white/30">Saved {formatTime(lastSaved)}</span>
+                    )}
+                    {/* Start Fresh Button - for testing new generation */}
+                    {flowState === "generated" && (
+                        <button
+                            onClick={() => {
+                                if (confirm("Start a new project? This will clear the current work.")) {
+                                    setFlowState("idle");
+                                    setGeneratedCode("");
+                                    setPreviewHtml("");
+                                    setGeneratedFiles([]);
+                                    setModificationHistory([]);
+                                    setStudioConfig(null);
+                                    setUploadedPages([]);
+                                    setLayoutAnalysis(null);
+                                    setProjectId(null);
+                                    setProjectName("Untitled Project");
+                                    window.history.replaceState({}, "", "/studio");
+                                    localStorage.removeItem(STORAGE_KEY);
+                                }
+                            }}
+                            className="text-xs text-white/40 hover:text-white transition-colors px-3 py-1 rounded border border-white/10 hover:border-white/20"
+                        >
+                            Start Fresh
+                        </button>
                     )}
                     {/* Save Button */}
                     <button
@@ -642,16 +764,56 @@ export default function StudioPage() {
                     {/* Error Display */}
                     {errorMessage && (
                         <div className="p-4 border-t border-white/[0.06]">
-                            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                                <p className="text-xs text-red-400">{errorMessage}</p>
+                            <div className={`p-3 rounded-lg border ${
+                                errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('⚠️')
+                                    ? 'bg-amber-500/10 border-amber-500/20'
+                                    : 'bg-red-500/10 border-red-500/20'
+                            }`}>
+                                <p className={`text-xs ${
+                                    errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('⚠️')
+                                        ? 'text-amber-400'
+                                        : 'text-red-400'
+                                }`}>
+                                    {errorMessage}
+                                </p>
+                                {(errorMessage.includes('quota') || errorMessage.includes('rate limit')) && (
+                                    <div className="mt-3 text-xs text-white/60 space-y-2">
+                                        <p className="font-semibold text-white/80">Solutions:</p>
+                                        <ul className="list-disc list-inside space-y-1 ml-2">
+                                            <li>Wait 24 hours for quota reset</li>
+                                            <li>
+                                                <a 
+                                                    href="https://aistudio.google.com/app/apikey" 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-400 hover:underline"
+                                                >
+                                                    Upgrade to paid tier
+                                                </a> (~$5-10/month)
+                                            </li>
+                                            <li>
+                                                <a 
+                                                    href="https://ai.dev/rate-limit" 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-400 hover:underline"
+                                                >
+                                                    Check your usage
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                )}
                                 <button
                                     onClick={() => {
                                         setErrorMessage("");
-                                        setFlowState("analyzed");
+                                        if (flowState === "error") {
+                                            setFlowState("analyzed");
+                                        }
                                     }}
-                                    className="mt-2 text-xs text-white/40 hover:text-white underline"
+                                    className="mt-3 text-xs text-white/40 hover:text-white underline"
                                 >
-                                    Try again
+                                    Dismiss
                                 </button>
                             </div>
                         </div>
@@ -668,15 +830,6 @@ export default function StudioPage() {
                     />
                 )}
             </AnimatePresence>
-
-            {/* ===== FLOATING VOICE PANEL ===== */}
-            {flowState === "generated" && (
-                <FloatingVoicePanel
-                    onCommand={handleModify}
-                    isProcessing={isModifying}
-                    isVisible={true}
-                />
-            )}
         </div>
     );
 }

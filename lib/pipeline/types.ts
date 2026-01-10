@@ -54,6 +54,7 @@ export interface PipelineConfig {
     navType: string;
     pageFlowInstructions?: string;
     pages?: { name: string; role: string }[];
+    textPrompt?: string; // For text-to-website generation without an image
 }
 
 export type PipelineCallback = (stage: PipelineStage) => void;
