@@ -827,12 +827,30 @@ function getFrameworkOutputInstructions(techStack: string): string {
     switch (techStack) {
         case "html":
             return `CRITICAL OUTPUT FORMAT - HTML:
-- Output a COMPLETE HTML document starting with <!DOCTYPE html>
-- Include <html>, <head>, and <body> tags
-- Embed ALL CSS in <style> tags in the head
+- Output a COMPLETE HTML document
+- MUST start with: <!DOCTYPE html>
+- MUST include <html>, <head>, and <body> tags
+- Embed ALL CSS in <style> tags inside <head>
 - Embed ALL JavaScript in <script> tags before </body>
-- Use Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
-- The output MUST render directly in a browser without any build step`;
+- Add Tailwind CDN in head: <script src="https://cdn.tailwindcss.com"></script>
+- The output MUST be valid HTML that renders directly in a browser
+
+EXAMPLE STRUCTURE:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Page Title</title>
+</head>
+<body>
+  <!-- Your UI code here -->
+</body>
+</html>
+
+DO NOT output just text or links without HTML tags.
+DO NOT omit the DOCTYPE, html, head, or body elements.`;
 
         case "react":
             return `CRITICAL OUTPUT FORMAT - REACT TSX:

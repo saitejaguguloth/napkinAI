@@ -16,12 +16,12 @@ interface PreviewEngineProps {
   isGenerating?: boolean;
 }
 
-export default function PreviewEngine({ 
-  files, 
-  techStack, 
-  previewHtml, 
-  generatedCode, 
-  isGenerating 
+export default function PreviewEngine({
+  files,
+  techStack,
+  previewHtml,
+  generatedCode,
+  isGenerating
 }: PreviewEngineProps) {
   const html = generatePreviewHTML(files, techStack, previewHtml, generatedCode);
 
@@ -43,9 +43,9 @@ export default function PreviewEngine({
 }
 
 function generatePreviewHTML(
-  files: GeneratedFile[], 
-  techStack: string, 
-  previewHtml?: string, 
+  files: GeneratedFile[],
+  techStack: string,
+  previewHtml?: string,
   generatedCode?: string
 ): string {
   // Priority: previewHtml > generatedCode > files
@@ -105,18 +105,52 @@ function generatePreviewHTML(
 }
 
 function wrapWithTailwind(content: string): string {
-  // If already has DOCTYPE or html tag, just ensure Tailwind is included
-  if (content.includes("<!DOCTYPE") || content.includes("<html")) {
-    if (!content.includes("tailwindcss")) {
-      return content.replace(
-        "<head>",
-        '<head><script src="https://cdn.tailwindcss.com"></script>'
-      );
-    }
-    return content;
+  // Trim whitespace
+  const trimmed = content.trim();
+
+  // Check if content looks like it might be incomplete/malformed HTML
+  // (e.g., just text or links without proper HTML tags)
+  const hasHtmlTags = trimmed.includes('<') && trimmed.includes('>');
+  const hasDoctype = trimmed.toLowerCase().includes('<!doctype');
+  const hasHtmlElement = trimmed.toLowerCase().includes('<html');
+  const hasBodyContent = trimmed.toLowerCase().includes('<body') || trimmed.toLowerCase().includes('<div') || trimmed.toLowerCase().includes('<section') || trimmed.toLowerCase().includes('<nav') || trimmed.toLowerCase().includes('<header');
+
+  // If no HTML-like content at all, it might be raw text - wrap it properly
+  if (!hasHtmlTags) {
+    console.warn('[PreviewEngine] Content has no HTML tags, wrapping as text');
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8 font-sans">
+  <div class="text-gray-800">
+    <p class="text-red-500 mb-4">⚠️ Generated content appears incomplete. Please regenerate.</p>
+    <pre class="bg-gray-100 p-4 rounded text-sm overflow-auto">${trimmed}</pre>
+  </div>
+</body>
+</html>`;
   }
 
-  // Wrap content in full HTML document
+  // If already has DOCTYPE or html tag, just ensure Tailwind is included
+  if (hasDoctype || hasHtmlElement) {
+    if (!trimmed.includes("tailwindcss")) {
+      // Try to inject Tailwind in head
+      if (trimmed.includes("<head>")) {
+        return trimmed.replace(
+          "<head>",
+          '<head><script src="https://cdn.tailwindcss.com"></script>'
+        );
+      }
+      // Fallback: inject at start
+      return '<script src="https://cdn.tailwindcss.com"></script>' + trimmed;
+    }
+    return trimmed;
+  }
+
+  // Has some HTML but missing document structure - wrap it
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -129,7 +163,8 @@ function wrapWithTailwind(content: string): string {
   </style>
 </head>
 <body>
-  ${content}
+  ${trimmed}
 </body>
 </html>`;
 }
+
