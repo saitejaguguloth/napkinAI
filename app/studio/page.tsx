@@ -15,6 +15,7 @@ import { IconSave, IconPreview, IconCode, IconSketch, IconText, IconExisting } f
 import TextPromptInput from "@/components/studio/TextPromptInput";
 import ExistingProjectInput from "@/components/studio/ExistingProjectInput";
 import PageFlowInstructions from "@/components/studio/PageFlowInstructions";
+import FloatingVoicePanel from "@/components/studio/FloatingVoicePanel";
 import type { ProjectStatus } from "@/types/project";
 
 // Flow states
@@ -667,6 +668,15 @@ export default function StudioPage() {
                     />
                 )}
             </AnimatePresence>
+
+            {/* ===== FLOATING VOICE PANEL ===== */}
+            {flowState === "generated" && (
+                <FloatingVoicePanel
+                    onCommand={handleModify}
+                    isProcessing={isModifying}
+                    isVisible={true}
+                />
+            )}
         </div>
     );
 }
