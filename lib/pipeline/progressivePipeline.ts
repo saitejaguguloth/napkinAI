@@ -263,7 +263,8 @@ export async function runProgressivePipeline(
             progress: 50,
             code: scaffoldCode,
             files: scaffoldFiles,
-            previewHtml: generateQuickPreviewHtml(scaffoldCode, config.techStack)
+            // Only send previewHtml for HTML - let PreviewEngine handle React/Next.js
+            previewHtml: config.techStack === 'html' ? generateQuickPreviewHtml(scaffoldCode, config.techStack) : undefined
         });
 
         // Stage 3: Styling Pass (~5-8 seconds)
@@ -275,7 +276,8 @@ export async function runProgressivePipeline(
             stage: 'styling',
             progress: 80,
             code: styledCode,
-            previewHtml: generateQuickPreviewHtml(styledCode, config.techStack)
+            // Only send previewHtml for HTML - let PreviewEngine handle React/Next.js
+            previewHtml: config.techStack === 'html' ? generateQuickPreviewHtml(styledCode, config.techStack) : undefined
         });
 
         // Stage 4: Package into files
@@ -299,7 +301,10 @@ export async function runProgressivePipeline(
             progress: 100,
             code: styledCode,
             files: result.files,
-            previewHtml: result.previewHtml || generateQuickPreviewHtml(styledCode, config.techStack)
+            // Only send previewHtml for HTML - PreviewEngine handles React/Next.js better
+            previewHtml: config.techStack === 'html'
+                ? (result.previewHtml || generateQuickPreviewHtml(styledCode, config.techStack))
+                : undefined
         };
 
         onProgress(finalStage);
