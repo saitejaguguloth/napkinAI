@@ -12,6 +12,8 @@ import ModifyChat from "@/components/studio/ModifyChat";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import CodeViewer from "@/components/studio/CodeViewer";
 import { IconSave, IconPreview, IconCode, IconSketch, IconText, IconExisting } from "@/components/studio/StudioIcons";
+import TextPromptInput from "@/components/studio/TextPromptInput";
+import ExistingProjectInput from "@/components/studio/ExistingProjectInput";
 import type { ProjectStatus } from "@/types/project";
 
 // Flow states
@@ -96,6 +98,7 @@ export default function StudioPage() {
 
     // Input type state
     const [inputType, setInputType] = useState<InputType>("sketch");
+    const [textPrompt, setTextPrompt] = useState("");
 
     // Flow state
     const [flowState, setFlowState] = useState<FlowState>("idle");
@@ -438,40 +441,6 @@ export default function StudioPage() {
                         className="bg-transparent text-sm font-medium text-white/90 focus:outline-none focus:text-white max-w-[200px]"
                     />
 
-                    {/* Input Type Selector */}
-                    <div className="w-px h-4 bg-white/10" />
-                    <div className="flex items-center gap-1 bg-white/[0.05] rounded-lg p-1">
-                        <button
-                            onClick={() => setInputType("sketch")}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all ${inputType === "sketch"
-                                ? "bg-white text-black"
-                                : "text-white/60 hover:text-white"
-                                }`}
-                        >
-                            <IconSketch size={14} />
-                            Sketch
-                        </button>
-                        <button
-                            onClick={() => setInputType("text")}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all ${inputType === "text"
-                                ? "bg-white text-black"
-                                : "text-white/60 hover:text-white"
-                                }`}
-                        >
-                            <IconText size={14} />
-                            Text
-                        </button>
-                        <button
-                            onClick={() => setInputType("existing")}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all ${inputType === "existing"
-                                ? "bg-white text-black"
-                                : "text-white/60 hover:text-white"
-                                }`}
-                        >
-                            <IconExisting size={14} />
-                            Existing
-                        </button>
-                    </div>
                 </div>
                 <div className="flex items-center gap-4">
                     {/* Flow Status */}
@@ -520,6 +489,8 @@ export default function StudioPage() {
                             hasImages={uploadedPages.length > 0}
                             savedConfig={studioConfig}
                             generationStep={generationStep}
+                            inputType={inputType}
+                            textPrompt={textPrompt}
                         />
                     ) : (
                         <ModifyChat
@@ -622,12 +593,30 @@ export default function StudioPage() {
                         </div>
                     </div>
                     <div className="flex-1 overflow-auto p-4">
-                        <ImageUploader
-                            pages={uploadedPages}
-                            onPagesChange={handlePagesChange}
-                            onImageClick={(dataUrl) => setLightboxImage(dataUrl)}
-                            disabled={flowState === "analyzing" || flowState === "generating"}
-                        />
+                        {inputType === "sketch" && (
+                            <ImageUploader
+                                pages={uploadedPages}
+                                onPagesChange={handlePagesChange}
+                                onImageClick={(dataUrl) => setLightboxImage(dataUrl)}
+                                disabled={flowState === "analyzing" || flowState === "generating"}
+                            />
+                        )}
+                        {inputType === "text" && (
+                            <TextPromptInput
+                                value={textPrompt}
+                                onChange={setTextPrompt}
+                                disabled={flowState === "analyzing" || flowState === "generating"}
+                            />
+                        )}
+                        {inputType === "existing" && (
+                            <ExistingProjectInput
+                                onProjectSelect={(project) => {
+                                    setProjectId(project.id);
+                                    setProjectName(project.name);
+                                }}
+                                disabled={flowState === "analyzing" || flowState === "generating"}
+                            />
+                        )}
                     </div>
 
                     {/* Error Display */}

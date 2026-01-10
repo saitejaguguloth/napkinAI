@@ -61,6 +61,8 @@ export interface SuggestionsPanelProps {
     hasImages: boolean;
     savedConfig: StudioConfig | null;
     generationStep?: GenerationStep;
+    inputType?: "sketch" | "text" | "existing";
+    textPrompt?: string;
 }
 
 // ... existing code
@@ -194,7 +196,12 @@ export default function SuggestionsPanel({
     hasImages,
     savedConfig,
     generationStep = "analyzing",
+    inputType = "sketch",
+    textPrompt = "",
 }: SuggestionsPanelProps) {
+    const inputMode = inputType || "sketch";
+    const hasTextContent = (textPrompt || "").trim().length > 10;
+    const hasValidInput = inputMode === "sketch" ? hasImages : inputMode === "text" ? hasTextContent : false;
     // Show progress when generating
     if (isGenerating) {
         return <GenerationProgress currentStep={generationStep} />;
@@ -208,8 +215,8 @@ export default function SuggestionsPanel({
     const [interactionLevel, setInteractionLevel] = useState<StudioConfig["interactionLevel"]>(savedConfig?.interactionLevel || "micro");
     const [features, setFeatures] = useState<string[]>(savedConfig?.features || []);
 
-    // Validation
-    const canConfirm = hasImages && colorPalette !== null;
+    // Validation - now supports text mode
+    const canConfirm = hasValidInput && colorPalette !== null;
 
     const toggleFeature = (featureId: string) => {
         setFeatures(prev =>
@@ -248,12 +255,12 @@ export default function SuggestionsPanel({
             {/* Scrollable Content */}
             <div className="flex-1 overflow-auto p-4 space-y-4">
                 {/* Analyze Button (if not analyzed yet) */}
-                {hasImages && !layoutAnalysis && !isAnalyzing && (
+                {hasValidInput && !layoutAnalysis && !isAnalyzing && (
                     <button
                         onClick={onAnalyze}
                         className="w-full py-3 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-all"
                     >
-                        Analyze Uploaded Images
+                        {inputMode === "text" ? "Generate from Description" : "Analyze Uploaded Images"}
                     </button>
                 )}
 

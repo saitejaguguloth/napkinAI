@@ -75,7 +75,7 @@ export default function Footer() {
                     className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4"
                 >
                     <p className="text-sm text-secondary">
-                        © 2024 NAPKIN. All rights reserved.
+                        © 2026 NAPKIN. All rights reserved.
                     </p>
 
                     <div className="flex items-center gap-6">
