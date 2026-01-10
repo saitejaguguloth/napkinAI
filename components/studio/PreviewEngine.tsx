@@ -376,8 +376,8 @@ function wrapReactCode(code: string): string {
         }
     }
 
-    // Escape backticks and backslashes in the code for template literal
-    const escapedCode = cleanCode.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+    // Build the final HTML with proper escaping
+    const codeJson = JSON.stringify(cleanCode);
 
     return `<!DOCTYPE html>
 <html>
@@ -433,12 +433,8 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
 window.addEventListener('load', function() {
     var root = document.getElementById('root');
     
-    if (typeof React === 'undefined') {
-        root.innerHTML = '<div class="preview-error">Failed to load React.</div>';
-        return;
-    }
-    if (typeof Babel === 'undefined') {
-        root.innerHTML = '<div class="preview-error">Failed to load Babel.</div>';
+    if (typeof React === 'undefined' || typeof ReactDOM === 'undefined' || typeof Babel === 'undefined') {
+        root.innerHTML = '<div class="preview-error">Failed to load React/Babel CDN. Check internet connection.</div>';
         return;
     }
     
@@ -466,40 +462,43 @@ window.addEventListener('load', function() {
         return React.createElement('img', Object.assign({}, props, { loading: 'lazy' }));
     }
     
-    var componentName = '${componentName}';
-    console.log('Looking for component:', componentName);
+    var detectedName = '${componentName}';
+    var jsxCode = ${codeJson};
     
-    var jsxCode = ${JSON.stringify(cleanCode)};
-    console.log('Code to transform:', jsxCode.substring(0, 200) + '...');
+    console.log('[Preview] Component name:', detectedName);
+    console.log('[Preview] Code preview:', jsxCode.substring(0, 300));
     
     try {
-        var codeWithExport = jsxCode + '\\nwindow.__COMPONENT__ = ' + componentName + ';';
-        console.log('Transforming with Babel...');
+        // Add component export to the code
+        var codeWithExport = jsxCode + '\\n\\nwindow.__PREVIEW_COMPONENT__ = ' + detectedName + ';';
         
+        console.log('[Preview] Transforming with Babel...');
         var transformed = Babel.transform(codeWithExport, {
             presets: ['react'],
             filename: 'preview.jsx'
         });
         
-        console.log('Babel transform successful');
+        console.log('[Preview] Babel successful, executing...');
         root.innerHTML = '<div class="preview-loading"><div class="spinner"></div><div>Mounting...</div></div>';
         
-        eval(transformed.code);
+        // Execute the transformed code
+        (0, eval)(transformed.code);
         
-        var Component = window.__COMPONENT__;
-        console.log('Component found:', typeof Component);
+        var Component = window.__PREVIEW_COMPONENT__;
+        console.log('[Preview] Component type:', typeof Component);
         
-        if (!Component) {
-            throw new Error('Component "' + componentName + '" not found. The component must be a function.');
+        if (typeof Component !== 'function') {
+            throw new Error('Component "' + detectedName + '" is not a valid React component (got ' + typeof Component + ')');
         }
         
         root.innerHTML = '';
         ReactDOM.createRoot(root).render(React.createElement(Component));
-        console.log('Render complete!');
+        console.log('[Preview] Render complete!');
         
     } catch (error) {
-        console.error('Preview Error:', error);
-        root.innerHTML = '<div class="preview-error">Error: ' + error.message + '</div>';
+        console.error('[Preview] Error:', error);
+        var msg = error.message || String(error);
+        root.innerHTML = '<div class="preview-error">Preview Error: ' + msg + '</div>';
     }
 });
 </script>
