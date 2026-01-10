@@ -32,8 +32,27 @@ interface SpeechRecognitionErrorEvent extends Event {
     message: string;
 }
 
+// SpeechRecognition interface for TypeScript
+interface ISpeechRecognition extends EventTarget {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    maxAlternatives: number;
+    onresult: ((event: SpeechRecognitionEvent) => void) | null;
+    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+    onstart: (() => void) | null;
+    onend: (() => void) | null;
+    start(): void;
+    stop(): void;
+    abort(): void;
+}
+
+interface ISpeechRecognitionConstructor {
+    new(): ISpeechRecognition;
+}
+
 // Get the SpeechRecognition constructor (browser-specific)
-const getSpeechRecognition = (): typeof SpeechRecognition | null => {
+const getSpeechRecognition = (): ISpeechRecognitionConstructor | null => {
     if (typeof window === 'undefined') return null;
 
     return (
@@ -42,6 +61,7 @@ const getSpeechRecognition = (): typeof SpeechRecognition | null => {
         null
     );
 };
+
 
 export interface VoiceRecognitionOptions {
     language?: string;
@@ -54,7 +74,7 @@ export interface VoiceRecognitionOptions {
 }
 
 export class VoiceRecognition {
-    private recognition: SpeechRecognition | null = null;
+    private recognition: ISpeechRecognition | null = null;
     private isListening = false;
     private options: VoiceRecognitionOptions;
 
