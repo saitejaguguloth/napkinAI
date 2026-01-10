@@ -50,7 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<EditRespo
         }
 
         const userPrompt = buildEditPrompt(existingCode, command);
-        const updatedCode = await generateWithTimeout(EDIT_SYSTEM_PROMPT, userPrompt, 45000);
+        const updatedCode = await generateWithTimeout(EDIT_SYSTEM_PROMPT, userPrompt, 55000);
 
         if (!updatedCode || updatedCode.length === 0) {
             return NextResponse.json(
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<EditRespo
 
         if (message.includes("timed out")) {
             return NextResponse.json(
-                { code: "", error: "Edit timed out. Please try again." },
+                { code: "", error: "Edit timed out. Try a simpler command." },
                 { status: 504 }
             );
         }
