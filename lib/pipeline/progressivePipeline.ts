@@ -72,15 +72,35 @@ async function generateScaffold(
     config: PipelineConfig,
     sections: string[]
 ): Promise<string> {
+    const hasMultiplePages = config.pages && config.pages.length > 1;
+
     // Build pages context if available
-    const pagesContext = config.pages && config.pages.length > 1
-        ? `\nPAGES: ${config.pages.map((p, i) => `Page ${i + 1}: ${p.name} (${p.role})`).join(', ')}`
+    const pagesContext = hasMultiplePages
+        ? `\n\nMULTIPLE PAGES TO GENERATE:\n${config.pages!.map((p, i) => `- Page ${i + 1}: "${p.name}" (${p.role})`).join('\n')}\n\nYou MUST generate ALL ${config.pages!.length} pages in the output.`
         : '';
 
-    // Build navigation instructions if available
-    const navInstructions = config.pageFlowInstructions
-        ? `\nNAVIGATION FLOW:\n${config.pageFlowInstructions}\n\nIMPORTANT: Implement the navigation logic described above. For ${config.techStack === 'html' ? 'HTML, use anchor links and data-navigate attributes' : config.techStack === 'nextjs' ? 'Next.js, use Link component with proper routing' : 'React, use onClick handlers that could connect to react-router'}.`
-        : '';
+    // Build navigation instructions for multi-page
+    let navInstructions = '';
+    if (hasMultiplePages && config.techStack === 'html') {
+        navInstructions = `
+MULTI-PAGE IMPLEMENTATION (CRITICAL):
+1. Create a wrapper div for EACH page with id="page-1", id="page-2", etc.
+2. Only Page 1 should be visible initially (display: block), others hidden (display: none)
+3. Add this JavaScript navigation function:
+   function showPage(pageNum) {
+     document.querySelectorAll('[id^="page-"]').forEach(p => p.style.display = 'none');
+     document.getElementById('page-' + pageNum).style.display = 'block';
+   }
+4. All navigation buttons/links should call showPage(N) onclick
+${config.pageFlowInstructions ? `\nNAVIGATION FLOW:\n${config.pageFlowInstructions}` : ''}
+
+Example structure:
+<div id="page-1"><!-- Page 1 content --></div>
+<div id="page-2" style="display:none"><!-- Page 2 content --></div>
+<button onclick="showPage(2)">Get Started</button>`;
+    } else if (config.pageFlowInstructions) {
+        navInstructions = `\nNAVIGATION FLOW:\n${config.pageFlowInstructions}\n\nIMPORTANT: Implement the navigation logic described above.`;
+    }
 
     const prompt = `Convert this sketch to ${config.techStack === 'html' ? 'HTML' : 'React TSX'} code.
 ${pagesContext}
@@ -92,7 +112,7 @@ REQUIREMENTS:
 - Basic grayscale colors for now (styling comes later)
 - Include placeholder text and structure
 ${navInstructions}
-OUTPUT: Only the code, no explanations.`;
+OUTPUT: Only the complete code, no explanations.`;
 
     return callGeminiFlash(imageBase64, mimeType, prompt);
 }
@@ -301,14 +321,35 @@ export async function runProgressivePipeline(
  */
 function generateQuickPreviewHtml(code: string, techStack: string): string {
     if (techStack === 'html') {
-        // Already HTML, wrap if needed
-        if (code.toLowerCase().includes('<!doctype')) {
-            return code;
-        }
-        return `<!DOCTYPE html>
+        let html = code;
+
+        // Check if it needs DOCTYPE wrapping
+        if (!html.toLowerCase().includes('<!doctype')) {
+            html = `<!DOCTYPE html>
 <html><head>
 <script src="https://cdn.tailwindcss.com"></script>
-</head><body>${code}</body></html>`;
+</head><body>${html}</body></html>`;
+        }
+
+        // Inject multi-page navigation script if page sections exist
+        if (html.includes('id="page-') && !html.includes('function showPage')) {
+            const navScript = `
+<script>
+function showPage(pageNum) {
+  document.querySelectorAll('[id^="page-"]').forEach(function(p) { p.style.display = 'none'; });
+  var target = document.getElementById('page-' + pageNum);
+  if (target) target.style.display = 'block';
+}
+</script>`;
+            // Inject before </body> or at end
+            if (html.includes('</body>')) {
+                html = html.replace('</body>', navScript + '</body>');
+            } else {
+                html += navScript;
+            }
+        }
+
+        return html;
     }
 
     // For React/Vue/Svelte, render with Babel/CDN
