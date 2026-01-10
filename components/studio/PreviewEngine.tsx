@@ -21,19 +21,31 @@ interface PreviewEngineProps {
     isGenerating?: boolean;
 }
 
-// Status messages
-const STATUS_MESSAGES: Record<PreviewStatus, string> = {
-    idle: "Waiting for code...",
-    preparing: "Preparing runtime...",
-    compiling: "Compiling code...",
-    rendering: "Rendering preview...",
-    ready: "",
-    error: "Preview error"
+// Status messages with more detail
+const STATUS_MESSAGES: Record<PreviewStatus, { title: string; detail: string }> = {
+    idle: { title: "Waiting for code...", detail: "" },
+    preparing: { title: "Starting preview server...", detail: "Initializing runtime environment" },
+    compiling: { title: "Bundling application...", detail: "Transpiling JSX and processing imports" },
+    rendering: { title: "Launching preview...", detail: "Mounting React components" },
+    ready: { title: "", detail: "" },
+    error: { title: "Preview Error", detail: "" }
 };
 
+// Get runtime mode label
+function getRuntimeLabel(stack: TechStack): string {
+    switch (stack) {
+        case "html": return "Static HTML";
+        case "react": return "React Runtime";
+        case "nextjs": return "Next.js Runtime";
+        case "vue": return "Vue Runtime";
+        case "svelte": return "Svelte (Static)";
+        default: return "Preview";
+    }
+}
+
 /**
- * PreviewEngine - Handles rendering of generated code based on tech stack
- * Uses in-browser compilation for React/Vue, static rendering for HTML/Svelte
+ * Enhanced PreviewEngine - Handles rendering of generated code based on tech stack
+ * Now with better error handling, loading states, and runtime indicators
  */
 export default function PreviewEngine({
     techStack,
@@ -46,7 +58,7 @@ export default function PreviewEngine({
     const [status, setStatus] = useState<PreviewStatus>("idle");
     const [error, setError] = useState<string | null>(null);
     const [compiledHtml, setCompiledHtml] = useState<string>("");
-    const [iframeKey, setIframeKey] = useState(0); // For forcing iframe refresh
+    const [iframeKey, setIframeKey] = useState(0);
 
     // Build preview when inputs change
     useEffect(() => {
@@ -84,6 +96,9 @@ export default function PreviewEngine({
         setError(null);
 
         try {
+            // Simulate brief compilation time for UX
+            await new Promise(resolve => setTimeout(resolve, 300));
+
             let html: string;
 
             switch (stack) {
@@ -104,9 +119,12 @@ export default function PreviewEngine({
                     html = compileHtml(fileList);
             }
 
+            setStatus("rendering");
+            await new Promise(resolve => setTimeout(resolve, 200));
+
             setCompiledHtml(html);
             setStatus("ready");
-            setIframeKey(prev => prev + 1); // Force iframe refresh
+            setIframeKey(prev => prev + 1);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Compilation failed");
             setStatus("error");
@@ -114,11 +132,13 @@ export default function PreviewEngine({
     }, []);
 
     // Compile from raw code string
-    const compileFromCode = useCallback((stack: TechStack, code: string) => {
+    const compileFromCode = useCallback(async (stack: TechStack, code: string) => {
         setStatus("compiling");
         setError(null);
 
         try {
+            await new Promise(resolve => setTimeout(resolve, 300));
+
             let html: string;
 
             if (stack === "html") {
@@ -131,6 +151,9 @@ export default function PreviewEngine({
                 html = wrapHtml(code);
             }
 
+            setStatus("rendering");
+            await new Promise(resolve => setTimeout(resolve, 200));
+
             setCompiledHtml(html);
             setStatus("ready");
             setIframeKey(prev => prev + 1);
@@ -142,21 +165,23 @@ export default function PreviewEngine({
 
     // Render loading state
     if (status === "idle" || status === "preparing" || status === "compiling" || status === "rendering") {
+        const { title, detail } = STATUS_MESSAGES[status];
         return (
-            <div className="h-full w-full flex items-center justify-center bg-neutral-900">
+            <div className="h-full w-full flex flex-col items-center justify-center bg-neutral-900">
                 <div className="text-center">
                     <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                        className="w-10 h-10 border-3 border-white/20 border-t-white/60 rounded-full mx-auto mb-4"
+                        className="w-10 h-10 border-2 border-white/20 border-t-white/60 rounded-full mx-auto mb-4"
                     />
-                    <p className="text-white/60 text-sm">{STATUS_MESSAGES[status]}</p>
-                    {techStack !== "html" && (
-                        <p className="text-white/30 text-xs mt-2">
-                            {techStack === "react" || techStack === "nextjs" ? "Loading React runtime..." :
-                                techStack === "vue" ? "Loading Vue runtime..." : "Preparing preview..."}
-                        </p>
+                    <p className="text-white/70 text-sm font-medium">{title}</p>
+                    {detail && (
+                        <p className="text-white/40 text-xs mt-1">{detail}</p>
                     )}
+                    <div className="mt-4 px-3 py-1 bg-white/5 rounded-full inline-flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                        <span className="text-xs text-white/50">{getRuntimeLabel(techStack)}</span>
+                    </div>
                 </div>
             </div>
         );
@@ -165,34 +190,54 @@ export default function PreviewEngine({
     // Render error state
     if (status === "error") {
         return (
-            <div className="h-full w-full flex items-center justify-center bg-neutral-900">
-                <div className="text-center max-w-md px-4">
-                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-                        <span className="text-red-400 text-xl">!</span>
+            <div className="h-full w-full flex flex-col bg-neutral-900">
+                {/* Error header */}
+                <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center">
+                            <span className="text-red-400 text-xs font-bold">!</span>
+                        </div>
+                        <span className="text-red-400 text-sm font-medium">Preview Error</span>
+                        <span className="text-white/40 text-xs ml-auto">{getRuntimeLabel(techStack)}</span>
                     </div>
-                    <p className="text-white/80 text-sm mb-2">Preview Error</p>
-                    <p className="text-white/40 text-xs font-mono">{error}</p>
-                    <button
-                        onClick={() => files.length > 0 ? compilePreview(techStack, files) : null}
-                        className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-white/70 text-sm transition"
-                    >
-                        Retry
-                    </button>
+                </div>
+
+                {/* Error content */}
+                <div className="flex-1 flex items-center justify-center p-4">
+                    <div className="text-center max-w-lg">
+                        <pre className="text-left bg-black/50 rounded-lg p-4 text-xs text-red-300 font-mono overflow-auto max-h-48 mb-4">
+                            {error}
+                        </pre>
+                        <button
+                            onClick={() => generatedCode ? compileFromCode(techStack, generatedCode) : (files.length > 0 ? compilePreview(techStack, files) : null)}
+                            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white/70 text-sm transition"
+                        >
+                            Retry Compilation
+                        </button>
+                    </div>
                 </div>
             </div>
         );
     }
 
-    // Render preview
+    // Render preview with runtime indicator
     return (
-        <iframe
-            ref={iframeRef}
-            key={iframeKey}
-            srcDoc={compiledHtml}
-            className="w-full h-full border-0 bg-white"
-            sandbox="allow-scripts allow-popups allow-forms allow-modals"
-            title="Preview"
-        />
+        <div className="h-full w-full relative">
+            {/* Runtime indicator badge */}
+            <div className="absolute top-2 right-2 z-10 px-2 py-1 bg-black/60 backdrop-blur rounded text-[10px] text-white/50 flex items-center gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${techStack === 'html' ? 'bg-green-400' : 'bg-blue-400'}`} />
+                {getRuntimeLabel(techStack)}
+            </div>
+
+            <iframe
+                ref={iframeRef}
+                key={iframeKey}
+                srcDoc={compiledHtml}
+                className="w-full h-full border-0 bg-white"
+                sandbox="allow-scripts allow-popups allow-forms allow-modals allow-same-origin"
+                title="Preview"
+            />
+        </div>
     );
 }
 
@@ -204,7 +249,6 @@ function compileHtml(files: GeneratedFile[]): string {
     const htmlFile = files.find(f => f.path.endsWith('.html') || f.path === 'index.html');
     if (htmlFile) {
         let content = htmlFile.content;
-        // Ensure Tailwind is included
         if (!content.includes('tailwindcss.com')) {
             content = content.replace('<head>', '<head>\n<script src="https://cdn.tailwindcss.com"></script>');
         }
@@ -214,7 +258,6 @@ function compileHtml(files: GeneratedFile[]): string {
 }
 
 function compileReact(files: GeneratedFile[]): string {
-    // Find main component file
     const mainFile = files.find(f =>
         f.path.includes('App.tsx') ||
         f.path.includes('App.jsx') ||
@@ -245,11 +288,9 @@ function compileSvelte(files: GeneratedFile[]): string {
         return getPlaceholderHtml("No Svelte component found");
     }
 
-    // Extract HTML from Svelte (can't compile Svelte in browser)
     let content = svelteFile.content;
     content = content.replace(/<script[\s\S]*?<\/script>/gi, '');
     content = content.replace(/<style[\s\S]*?<\/style>/gi, '');
-    // Clean up Svelte syntax
     content = content.replace(/\{#[\s\S]*?\}/g, '');
     content = content.replace(/\{\/[\s\S]*?\}/g, '');
     content = content.replace(/\{:[\s\S]*?\}/g, '');
@@ -304,18 +345,31 @@ function wrapReactCode(code: string): string {
     // Remove 'use client' directive
     cleanCode = cleanCode.replace(/["']use client["'];?\s*/g, '');
 
-    // Remove import statements
-    cleanCode = cleanCode.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '');
-    cleanCode = cleanCode.replace(/^import\s+['"].*?['"];?\s*$/gm, '');
-    cleanCode = cleanCode.replace(/^import\s+\{[\s\S]*?\}\s+from\s+['"].*?['"];?\s*$/gm, '');
+    // Remove TypeScript type annotations (simplified)
+    cleanCode = cleanCode.replace(/:\s*React\.\w+(\<[^>]*\>)?/g, '');
+    cleanCode = cleanCode.replace(/:\s*(string|number|boolean|any|void|null|undefined)(\[\])?/g, '');
+    cleanCode = cleanCode.replace(/<(\w+)\s+extends\s+[^>]+>/g, '<$1>');
 
-    // Handle default export patterns
+    // Remove import statements (comprehensive patterns)
+    cleanCode = cleanCode.replace(/^import\s+type\s+.*?;?\s*$/gm, '');
+    cleanCode = cleanCode.replace(/^import\s+\{[^}]*\}\s+from\s+['"][^'"]+['"];?\s*$/gm, '');
+    cleanCode = cleanCode.replace(/^import\s+\*\s+as\s+\w+\s+from\s+['"][^'"]+['"];?\s*$/gm, '');
+    cleanCode = cleanCode.replace(/^import\s+\w+\s*,?\s*\{?[^}]*\}?\s*from\s+['"][^'"]+['"];?\s*$/gm, '');
+    cleanCode = cleanCode.replace(/^import\s+['"][^'"]+['"];?\s*$/gm, '');
+
+    // Remove any remaining import lines
+    cleanCode = cleanCode.split('\n').filter(line => !line.trim().startsWith('import ')).join('\n');
+
+    // Handle export patterns
     cleanCode = cleanCode.replace(/export\s+default\s+function\s+(\w+)/g, 'function $1');
     cleanCode = cleanCode.replace(/export\s+default\s+/g, '');
+    cleanCode = cleanCode.replace(/export\s+function\s+(\w+)/g, 'function $1');
+    cleanCode = cleanCode.replace(/export\s+const\s+/g, 'const ');
 
-    // Find component name - look for function declarations
+    // Find component name
     const funcMatch = cleanCode.match(/function\s+([A-Z]\w*)\s*\(/);
-    const componentName = funcMatch ? funcMatch[1] : 'App';
+    const arrowMatch = cleanCode.match(/const\s+([A-Z]\w*)\s*=\s*\(/);
+    const componentName = funcMatch?.[1] || arrowMatch?.[1] || 'App';
 
     return `<!DOCTYPE html>
 <html>
@@ -327,58 +381,94 @@ function wrapReactCode(code: string): string {
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <style>
-body { margin: 0; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
 #root { min-height: 100vh; }
 .preview-error {
     position: fixed;
     top: 0; left: 0; right: 0;
-    background: #FEE2E2;
+    background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
     color: #991B1B;
-    padding: 12px 16px;
-    font-family: monospace;
+    padding: 16px 20px;
+    font-family: 'SF Mono', Monaco, monospace;
     font-size: 13px;
     z-index: 9999;
+    border-bottom: 2px solid #F87171;
+}
+.preview-error::before {
+    content: '⚠️ ';
+}
+.preview-loading {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #18181B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #71717A;
+    font-family: system-ui;
 }
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div class="preview-loading">Loading React...</div></div>
 <script type="text/babel" data-presets="react">
 // React hooks from global React
-const { useState, useEffect, useRef, useCallback, useMemo, useContext, createContext } = React;
+const { 
+    useState, useEffect, useRef, useCallback, useMemo, 
+    useContext, createContext, Fragment, memo,
+    useReducer, useLayoutEffect, useImperativeHandle,
+    forwardRef, lazy, Suspense
+} = React;
+
+// Mock common packages
+const Link = ({ children, href, ...props }) => React.createElement('a', { href: href || '#', ...props }, children);
+const Image = ({ src, alt, ...props }) => React.createElement('img', { src, alt, loading: 'lazy', ...props });
 
 // Error boundary wrapper
 class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
-        this.state = { hasError: false, error: null };
+        this.state = { hasError: false, error: null, errorInfo: null };
     }
     static getDerivedStateFromError(error) {
         return { hasError: true, error };
     }
+    componentDidCatch(error, errorInfo) {
+        this.setState({ errorInfo });
+        console.error('React Error:', error, errorInfo);
+    }
     render() {
         if (this.state.hasError) {
             return React.createElement('div', { className: 'preview-error' },
-                'Error: ' + (this.state.error?.message || 'Unknown error')
+                'Runtime Error: ' + (this.state.error?.message || 'Unknown error')
             );
         }
         return this.props.children;
     }
 }
 
+// Window error handler
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    document.getElementById('root').innerHTML = '<div class="preview-error">JavaScript Error: ' + msg + '</div>';
+    return false;
+};
+
 try {
 ${cleanCode}
 
 // Render the app
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const rootElement = document.getElementById('root');
+rootElement.innerHTML = ''; // Clear loading
+const root = ReactDOM.createRoot(rootElement);
 root.render(
     React.createElement(ErrorBoundary, null,
         React.createElement(${componentName})
     )
 );
 } catch (error) {
+    console.error('Compilation Error:', error);
     document.getElementById('root').innerHTML = '<div class="preview-error">Compile Error: ' + error.message + '</div>';
-    console.error('React compilation error:', error);
 }
 </script>
 </body>
@@ -386,7 +476,6 @@ root.render(
 }
 
 function wrapVueCode(code: string): string {
-    // Extract template, script, and style from SFC
     const templateMatch = code.match(/<template>([\s\S]*?)<\/template>/);
     const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/);
     const styleMatch = code.match(/<style[^>]*>([\s\S]*?)<\/style>/);
@@ -395,7 +484,6 @@ function wrapVueCode(code: string): string {
     let script = scriptMatch ? scriptMatch[1].trim() : '';
     const style = styleMatch ? styleMatch[1].trim() : '';
 
-    // Clean script for browser usage
     script = script.replace(/import\s+.*?from\s+['"].*?['"];?\s*/g, '');
 
     return `<!DOCTYPE html>
