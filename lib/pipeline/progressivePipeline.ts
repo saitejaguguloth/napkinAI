@@ -303,24 +303,91 @@ function generateQuickPreviewHtml(code: string, techStack: string): string {
 
     // For React/Vue/Svelte, render with Babel/CDN
     if (techStack === 'react' || techStack === 'nextjs') {
-        // Remove 'use client' and convert to browser-compatible format
-        const cleanCode = code
-            .replace(/["']use client["'];?\s*/g, '')
-            .replace(/export default function \w+/g, 'function App')
-            .replace(/export default /g, '');
+        // Clean up the code for browser execution
+        let cleanCode = code;
+
+        // Remove 'use client' directive
+        cleanCode = cleanCode.replace(/["']use client["'];?\s*/g, '');
+
+        // Remove import statements (including multi-line)
+        cleanCode = cleanCode.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '');
+        cleanCode = cleanCode.replace(/^import\s+['"].*?['"];?\s*$/gm, '');
+        cleanCode = cleanCode.replace(/^import\s+\{[\s\S]*?\}\s+from\s+['"].*?['"];?\s*$/gm, '');
+
+        // Handle export default patterns
+        cleanCode = cleanCode.replace(/export\s+default\s+function\s+(\w+)/g, 'function $1');
+        cleanCode = cleanCode.replace(/export\s+default\s+/g, '');
+
+        // Find component name - look for function declarations starting with uppercase
+        const funcMatch = cleanCode.match(/function\s+([A-Z]\w*)\s*\(/);
+        const componentName = funcMatch ? funcMatch[1] : 'App';
 
         return `<!DOCTYPE html>
-<html><head>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</head><body>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<style>
+body { margin: 0; }
+#root { min-height: 100vh; }
+.preview-error {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: #FEE2E2;
+    color: #991B1B;
+    padding: 12px 16px;
+    font-family: monospace;
+    font-size: 13px;
+    z-index: 9999;
+}
+</style>
+</head>
+<body>
 <div id="root"></div>
-<script type="text/babel">
+<script type="text/babel" data-presets="react">
+// React hooks from global React
+const { useState, useEffect, useRef, useCallback, useMemo, useContext, createContext, Fragment } = React;
+
+// Error boundary wrapper
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+    }
+    render() {
+        if (this.state.hasError) {
+            return React.createElement('div', { className: 'preview-error' },
+                'Error: ' + (this.state.error?.message || 'Unknown error')
+            );
+        }
+        return this.props.children;
+    }
+}
+
+try {
 ${cleanCode}
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-</script></body></html>`;
+
+// Render the app
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+    React.createElement(ErrorBoundary, null,
+        React.createElement(${componentName})
+    )
+);
+} catch (error) {
+    document.getElementById('root').innerHTML = '<div class="preview-error">Compile Error: ' + error.message + '</div>';
+    console.error('React compilation error:', error);
+}
+</script>
+</body>
+</html>`;
     }
 
     // Fallback
