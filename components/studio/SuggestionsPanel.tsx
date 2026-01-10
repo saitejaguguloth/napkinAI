@@ -46,6 +46,8 @@ interface LayoutAnalysis {
     structure: string;
     navigation: string;
     components: string[];
+    // Multi-page support
+    pages?: { name: string; type: string; sections: string[] }[];
 }
 
 
@@ -63,6 +65,7 @@ export interface SuggestionsPanelProps {
     generationStep?: GenerationStep;
     inputType?: "sketch" | "text" | "existing";
     textPrompt?: string;
+    uploadedPages?: { name: string; role: string }[];
 }
 
 // ... existing code
@@ -198,6 +201,7 @@ export default function SuggestionsPanel({
     generationStep = "analyzing",
     inputType = "sketch",
     textPrompt = "",
+    uploadedPages = [],
 }: SuggestionsPanelProps) {
     const inputMode = inputType || "sketch";
     const hasTextContent = (textPrompt || "").trim().length > 10;
@@ -277,19 +281,42 @@ export default function SuggestionsPanel({
 
                 {/* Detected Layout (if analyzed) */}
                 {layoutAnalysis && (
-                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-2">
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-3">
                         <div className="flex items-center gap-2">
                             <IconLayout size={14} className="text-white/40" />
                             <span className="text-xs text-white/40 uppercase">Detected</span>
                         </div>
-                        <p className="text-sm text-white capitalize">{layoutAnalysis.pageType} page</p>
-                        <div className="flex flex-wrap gap-1">
-                            {layoutAnalysis.sections.slice(0, 4).map((s, i) => (
-                                <span key={i} className="px-2 py-0.5 rounded bg-white/10 text-xs text-white/60">
-                                    {s}
-                                </span>
-                            ))}
-                        </div>
+
+                        {/* Show multiple pages if available */}
+                        {uploadedPages && uploadedPages.length > 1 ? (
+                            <div className="space-y-2">
+                                <p className="text-sm text-white/80">
+                                    {uploadedPages.length} Pages Detected
+                                </p>
+                                <div className="space-y-1">
+                                    {uploadedPages.map((page, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-xs">
+                                            <span className="w-5 h-5 rounded bg-white/10 flex items-center justify-center text-white/60">
+                                                {i + 1}
+                                            </span>
+                                            <span className="text-white/70">{page.name}</span>
+                                            <span className="text-white/40">({page.role})</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <p className="text-sm text-white capitalize">{layoutAnalysis.pageType} page</p>
+                                <div className="flex flex-wrap gap-1">
+                                    {layoutAnalysis.sections.slice(0, 4).map((s, i) => (
+                                        <span key={i} className="px-2 py-0.5 rounded bg-white/10 text-xs text-white/60">
+                                            {s}
+                                        </span>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

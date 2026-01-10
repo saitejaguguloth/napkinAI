@@ -499,6 +499,7 @@ export default function StudioPage() {
                             generationStep={generationStep}
                             inputType={inputType}
                             textPrompt={textPrompt}
+                            uploadedPages={uploadedPages.map(p => ({ name: p.name, role: p.role }))}
                         />
                     ) : (
                         <ModifyChat
