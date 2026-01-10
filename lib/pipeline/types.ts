@@ -52,6 +52,8 @@ export interface PipelineConfig {
     features: string[];
     pageType: string;
     navType: string;
+    pageFlowInstructions?: string;
+    pages?: { name: string; role: string }[];
 }
 
 export type PipelineCallback = (stage: PipelineStage) => void;

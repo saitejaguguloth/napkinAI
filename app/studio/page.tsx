@@ -14,6 +14,7 @@ import CodeViewer from "@/components/studio/CodeViewer";
 import { IconSave, IconPreview, IconCode, IconSketch, IconText, IconExisting } from "@/components/studio/StudioIcons";
 import TextPromptInput from "@/components/studio/TextPromptInput";
 import ExistingProjectInput from "@/components/studio/ExistingProjectInput";
+import PageFlowInstructions from "@/components/studio/PageFlowInstructions";
 import type { ProjectStatus } from "@/types/project";
 
 // Flow states
@@ -99,6 +100,7 @@ export default function StudioPage() {
     // Input type state
     const [inputType, setInputType] = useState<InputType>("sketch");
     const [textPrompt, setTextPrompt] = useState("");
+    const [pageFlowInstructions, setPageFlowInstructions] = useState("");
 
     // Flow state
     const [flowState, setFlowState] = useState<FlowState>("idle");
@@ -149,6 +151,9 @@ export default function StudioPage() {
                 setModificationHistory(project.chatHistory);
                 setFlowState(project.status === "draft" ? "analyzed" : "generated");
                 setLastSaved(new Date(project.updatedAt));
+                if (project.pageFlowInstructions) {
+                    setPageFlowInstructions(project.pageFlowInstructions);
+                }
             }
         } catch (error) {
             console.error("Failed to load project:", error);
@@ -242,6 +247,8 @@ export default function StudioPage() {
                         features: config.features,
                         pageType: config.pageType,
                         navType: config.navType,
+                        pageFlowInstructions: pageFlowInstructions,
+                        pages: uploadedPages.map(p => ({ name: p.name, role: p.role })),
                     }
                 }),
             });
@@ -385,6 +392,7 @@ export default function StudioPage() {
                 thumbnailDataUrl,
                 pageCount: uploadedPages.length,
                 techStack: studioConfig.techStack,
+                pageFlowInstructions,
             };
 
             const response = await fetch("/api/projects/save", {
@@ -594,12 +602,22 @@ export default function StudioPage() {
                     </div>
                     <div className="flex-1 overflow-auto p-4">
                         {inputType === "sketch" && (
-                            <ImageUploader
-                                pages={uploadedPages}
-                                onPagesChange={handlePagesChange}
-                                onImageClick={(dataUrl) => setLightboxImage(dataUrl)}
-                                disabled={flowState === "analyzing" || flowState === "generating"}
-                            />
+                            <>
+                                <ImageUploader
+                                    pages={uploadedPages}
+                                    onPagesChange={handlePagesChange}
+                                    onImageClick={(dataUrl) => setLightboxImage(dataUrl)}
+                                    disabled={flowState === "analyzing" || flowState === "generating"}
+                                />
+
+                                {/* Page Flow Instructions - only shows when > 1 page */}
+                                <PageFlowInstructions
+                                    value={pageFlowInstructions}
+                                    onChange={setPageFlowInstructions}
+                                    disabled={flowState === "analyzing" || flowState === "generating"}
+                                    pageCount={uploadedPages.length}
+                                />
+                            </>
                         )}
                         {inputType === "text" && (
                             <TextPromptInput

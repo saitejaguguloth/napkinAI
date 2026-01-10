@@ -72,8 +72,18 @@ async function generateScaffold(
     config: PipelineConfig,
     sections: string[]
 ): Promise<string> {
-    const prompt = `Convert this sketch to ${config.techStack === 'html' ? 'HTML' : 'React TSX'} code.
+    // Build pages context if available
+    const pagesContext = config.pages && config.pages.length > 1
+        ? `\nPAGES: ${config.pages.map((p, i) => `Page ${i + 1}: ${p.name} (${p.role})`).join(', ')}`
+        : '';
 
+    // Build navigation instructions if available
+    const navInstructions = config.pageFlowInstructions
+        ? `\nNAVIGATION FLOW:\n${config.pageFlowInstructions}\n\nIMPORTANT: Implement the navigation logic described above. For ${config.techStack === 'html' ? 'HTML, use anchor links and data-navigate attributes' : config.techStack === 'nextjs' ? 'Next.js, use Link component with proper routing' : 'React, use onClick handlers that could connect to react-router'}.`
+        : '';
+
+    const prompt = `Convert this sketch to ${config.techStack === 'html' ? 'HTML' : 'React TSX'} code.
+${pagesContext}
 REQUIREMENTS:
 - ${config.techStack === 'html' ? 'Complete HTML document with Tailwind CDN' : 'React functional component'}
 - Include these sections: ${sections.join(', ')}
@@ -81,7 +91,7 @@ REQUIREMENTS:
 - Use Tailwind CSS for styling
 - Basic grayscale colors for now (styling comes later)
 - Include placeholder text and structure
-
+${navInstructions}
 OUTPUT: Only the code, no explanations.`;
 
     return callGeminiFlash(imageBase64, mimeType, prompt);
