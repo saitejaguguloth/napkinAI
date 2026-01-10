@@ -32,7 +32,16 @@ function LoginForm() {
             await signInWithGoogle();
             handleSuccess();
         } catch (err: any) {
-            setError(err.message || "Failed to sign in with Google");
+            // Don't show error if user just closed the popup
+            if (err.code === "auth/popup-closed-by-user") {
+                // User closed popup, no error needed
+            } else if (err.code === "auth/cancelled-popup-request") {
+                // Another popup was opened, ignore
+            } else if (err.code === "auth/popup-blocked") {
+                setError("Popup was blocked. Please allow popups for this site.");
+            } else {
+                setError(err.message || "Failed to sign in with Google");
+            }
         } finally {
             setOauthLoading(null);
         }
@@ -45,7 +54,16 @@ function LoginForm() {
             await signInWithGithub();
             handleSuccess();
         } catch (err: any) {
-            setError(err.message || "Failed to sign in with GitHub");
+            // Don't show error if user just closed the popup
+            if (err.code === "auth/popup-closed-by-user") {
+                // User closed popup, no error needed
+            } else if (err.code === "auth/cancelled-popup-request") {
+                // Another popup was opened, ignore
+            } else if (err.code === "auth/popup-blocked") {
+                setError("Popup was blocked. Please allow popups for this site.");
+            } else {
+                setError(err.message || "Failed to sign in with GitHub");
+            }
         } finally {
             setOauthLoading(null);
         }
