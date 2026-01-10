@@ -45,7 +45,6 @@ function getRuntimeLabel(stack: TechStack): string {
 
 /**
  * Enhanced PreviewEngine - Handles rendering of generated code based on tech stack
- * Now with better error handling, loading states, and runtime indicators
  */
 export default function PreviewEngine({
     techStack,
@@ -67,7 +66,7 @@ export default function PreviewEngine({
             return;
         }
 
-        // If we have previewHtml from API, use it directly
+        // If we have previewHtml from API (only for HTML), use it directly
         if (previewHtml) {
             setCompiledHtml(previewHtml);
             setStatus("ready");
@@ -96,8 +95,7 @@ export default function PreviewEngine({
         setError(null);
 
         try {
-            // Simulate brief compilation time for UX
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             let html: string;
 
@@ -119,9 +117,6 @@ export default function PreviewEngine({
                     html = compileHtml(fileList);
             }
 
-            setStatus("rendering");
-            await new Promise(resolve => setTimeout(resolve, 200));
-
             setCompiledHtml(html);
             setStatus("ready");
             setIframeKey(prev => prev + 1);
@@ -137,8 +132,6 @@ export default function PreviewEngine({
         setError(null);
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 300));
-
             let html: string;
 
             if (stack === "html") {
@@ -150,9 +143,6 @@ export default function PreviewEngine({
             } else {
                 html = wrapHtml(code);
             }
-
-            setStatus("rendering");
-            await new Promise(resolve => setTimeout(resolve, 200));
 
             setCompiledHtml(html);
             setStatus("ready");
@@ -175,9 +165,7 @@ export default function PreviewEngine({
                         className="w-10 h-10 border-2 border-white/20 border-t-white/60 rounded-full mx-auto mb-4"
                     />
                     <p className="text-white/70 text-sm font-medium">{title}</p>
-                    {detail && (
-                        <p className="text-white/40 text-xs mt-1">{detail}</p>
-                    )}
+                    {detail && <p className="text-white/40 text-xs mt-1">{detail}</p>}
                     <div className="mt-4 px-3 py-1 bg-white/5 rounded-full inline-flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
                         <span className="text-xs text-white/50">{getRuntimeLabel(techStack)}</span>
@@ -191,7 +179,6 @@ export default function PreviewEngine({
     if (status === "error") {
         return (
             <div className="h-full w-full flex flex-col bg-neutral-900">
-                {/* Error header */}
                 <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-3">
                     <div className="flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -201,8 +188,6 @@ export default function PreviewEngine({
                         <span className="text-white/40 text-xs ml-auto">{getRuntimeLabel(techStack)}</span>
                     </div>
                 </div>
-
-                {/* Error content */}
                 <div className="flex-1 flex items-center justify-center p-4">
                     <div className="text-center max-w-lg">
                         <pre className="text-left bg-black/50 rounded-lg p-4 text-xs text-red-300 font-mono overflow-auto max-h-48 mb-4">
@@ -223,12 +208,10 @@ export default function PreviewEngine({
     // Render preview with runtime indicator
     return (
         <div className="h-full w-full relative">
-            {/* Runtime indicator badge */}
             <div className="absolute top-2 right-2 z-10 px-2 py-1 bg-black/60 backdrop-blur rounded text-[10px] text-white/50 flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${techStack === 'html' ? 'bg-green-400' : 'bg-blue-400'}`} />
                 {getRuntimeLabel(techStack)}
             </div>
-
             <iframe
                 ref={iframeRef}
                 key={iframeKey}
@@ -291,18 +274,12 @@ function compileSvelte(files: GeneratedFile[]): string {
     let content = svelteFile.content;
     content = content.replace(/<script[\s\S]*?<\/script>/gi, '');
     content = content.replace(/<style[\s\S]*?<\/style>/gi, '');
-    content = content.replace(/\{#[\s\S]*?\}/g, '');
-    content = content.replace(/\{\/[\s\S]*?\}/g, '');
-    content = content.replace(/\{:[\s\S]*?\}/g, '');
-    content = content.replace(/\{[\w.]+\}/g, '...');
 
     return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
-<style>body{margin:0}</style>
 </head>
 <body>
 ${content}
@@ -345,19 +322,19 @@ function wrapReactCode(code: string): string {
     // Remove 'use client' directive
     cleanCode = cleanCode.replace(/["']use client["'];?\s*/g, '');
 
-    // Remove TypeScript type annotations (simplified)
-    cleanCode = cleanCode.replace(/:\s*React\.\w+(\<[^>]*\>)?/g, '');
+    // Remove TypeScript type annotations
+    cleanCode = cleanCode.replace(/:\s*React\.\w+(<[^>]*>)?/g, '');
     cleanCode = cleanCode.replace(/:\s*(string|number|boolean|any|void|null|undefined)(\[\])?/g, '');
     cleanCode = cleanCode.replace(/<(\w+)\s+extends\s+[^>]+>/g, '<$1>');
+    cleanCode = cleanCode.replace(/:\s*\{[^}]+\}/g, '');
+    cleanCode = cleanCode.replace(/:\s*\([^)]+\)\s*=>/g, '');
 
-    // Remove import statements (comprehensive patterns)
+    // Remove import statements
     cleanCode = cleanCode.replace(/^import\s+type\s+.*?;?\s*$/gm, '');
     cleanCode = cleanCode.replace(/^import\s+\{[^}]*\}\s+from\s+['"][^'"]+['"];?\s*$/gm, '');
     cleanCode = cleanCode.replace(/^import\s+\*\s+as\s+\w+\s+from\s+['"][^'"]+['"];?\s*$/gm, '');
     cleanCode = cleanCode.replace(/^import\s+\w+\s*,?\s*\{?[^}]*\}?\s*from\s+['"][^'"]+['"];?\s*$/gm, '');
     cleanCode = cleanCode.replace(/^import\s+['"][^'"]+['"];?\s*$/gm, '');
-
-    // Remove any remaining import lines
     cleanCode = cleanCode.split('\n').filter(line => !line.trim().startsWith('import ')).join('\n');
 
     // Handle export patterns
@@ -370,6 +347,9 @@ function wrapReactCode(code: string): string {
     const funcMatch = cleanCode.match(/function\s+([A-Z]\w*)\s*\(/);
     const arrowMatch = cleanCode.match(/const\s+([A-Z]\w*)\s*=\s*\(/);
     const componentName = funcMatch?.[1] || arrowMatch?.[1] || 'App';
+
+    // Escape backticks and backslashes in the code for template literal
+    const escapedCode = cleanCode.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
 
     return `<!DOCTYPE html>
 <html>
@@ -385,91 +365,110 @@ function wrapReactCode(code: string): string {
 body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
 #root { min-height: 100vh; }
 .preview-error {
-    position: fixed;
-    top: 0; left: 0; right: 0;
     background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
     color: #991B1B;
     padding: 16px 20px;
-    font-family: 'SF Mono', Monaco, monospace;
+    font-family: monospace;
     font-size: 13px;
-    z-index: 9999;
     border-bottom: 2px solid #F87171;
-}
-.preview-error::before {
-    content: '⚠️ ';
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 .preview-loading {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background: #18181B;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     color: #71717A;
     font-family: system-ui;
 }
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #333;
+    border-top-color: #666;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<div id="root"><div class="preview-loading">Loading React...</div></div>
-<script type="text/babel" data-presets="react">
-// React hooks from global React
-const { 
-    useState, useEffect, useRef, useCallback, useMemo, 
-    useContext, createContext, Fragment, memo,
-    useReducer, useLayoutEffect, useImperativeHandle,
-    forwardRef, lazy, Suspense
-} = React;
-
-// Mock common packages
-const Link = ({ children, href, ...props }) => React.createElement('a', { href: href || '#', ...props }, children);
-const Image = ({ src, alt, ...props }) => React.createElement('img', { src, alt, loading: 'lazy', ...props });
-
-// Error boundary wrapper
-class ErrorBoundary extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null, errorInfo: null };
+<div id="root">
+    <div class="preview-loading">
+        <div class="spinner"></div>
+        <div>Initializing React...</div>
+    </div>
+</div>
+<script>
+window.addEventListener('load', function() {
+    var root = document.getElementById('root');
+    
+    if (typeof React === 'undefined') {
+        root.innerHTML = '<div class="preview-error">Failed to load React. Check your internet connection.</div>';
+        return;
     }
-    static getDerivedStateFromError(error) {
-        return { hasError: true, error };
+    if (typeof ReactDOM === 'undefined') {
+        root.innerHTML = '<div class="preview-error">Failed to load ReactDOM.</div>';
+        return;
     }
-    componentDidCatch(error, errorInfo) {
-        this.setState({ errorInfo });
-        console.error('React Error:', error, errorInfo);
+    if (typeof Babel === 'undefined') {
+        root.innerHTML = '<div class="preview-error">Failed to load Babel.</div>';
+        return;
     }
-    render() {
-        if (this.state.hasError) {
-            return React.createElement('div', { className: 'preview-error' },
-                'Runtime Error: ' + (this.state.error?.message || 'Unknown error')
-            );
+    
+    root.innerHTML = '<div class="preview-loading"><div class="spinner"></div><div>Compiling JSX...</div></div>';
+    
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+    var useRef = React.useRef;
+    var useCallback = React.useCallback;
+    var useMemo = React.useMemo;
+    var useContext = React.useContext;
+    var createContext = React.createContext;
+    var Fragment = React.Fragment;
+    var memo = React.memo;
+    var useReducer = React.useReducer;
+    var useLayoutEffect = React.useLayoutEffect;
+    var forwardRef = React.forwardRef;
+    
+    var Link = function(props) {
+        return React.createElement('a', Object.assign({}, props, { href: props.href || '#' }), props.children);
+    };
+    var Image = function(props) {
+        return React.createElement('img', Object.assign({}, props, { loading: 'lazy' }));
+    };
+    
+    var jsxCode = \`${escapedCode}\`;
+    
+    try {
+        var transformed = Babel.transform(jsxCode + '\\nwindow.__COMPONENT__ = ${componentName};', {
+            presets: ['react'],
+            filename: 'preview.jsx'
+        });
+        
+        root.innerHTML = '<div class="preview-loading"><div class="spinner"></div><div>Mounting component...</div></div>';
+        
+        eval(transformed.code);
+        
+        var Component = window.__COMPONENT__;
+        if (!Component) {
+            throw new Error('Component "${componentName}" was not found.');
         }
-        return this.props.children;
+        
+        root.innerHTML = '';
+        var reactRoot = ReactDOM.createRoot(root);
+        reactRoot.render(React.createElement(Component));
+        
+    } catch (error) {
+        console.error('Preview Error:', error);
+        root.innerHTML = '<div class="preview-error">Error: ' + (error.message || 'Unknown error') + '</div>';
     }
-}
-
-// Window error handler
-window.onerror = function(msg, url, lineNo, columnNo, error) {
-    document.getElementById('root').innerHTML = '<div class="preview-error">JavaScript Error: ' + msg + '</div>';
-    return false;
-};
-
-try {
-${cleanCode}
-
-// Render the app
-const rootElement = document.getElementById('root');
-rootElement.innerHTML = ''; // Clear loading
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-    React.createElement(ErrorBoundary, null,
-        React.createElement(${componentName})
-    )
-);
-} catch (error) {
-    console.error('Compilation Error:', error);
-    document.getElementById('root').innerHTML = '<div class="preview-error">Compile Error: ' + error.message + '</div>';
-}
+});
 </script>
 </body>
 </html>`;
@@ -490,7 +489,6 @@ function wrapVueCode(code: string): string {
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <style>
@@ -501,19 +499,23 @@ ${style}
 <body>
 <div id="app">${template}</div>
 <script>
-const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
+var createApp = Vue.createApp;
+var ref = Vue.ref;
+var reactive = Vue.reactive;
+var computed = Vue.computed;
+var onMounted = Vue.onMounted;
+var watch = Vue.watch;
 
 try {
-    const app = createApp({
-        setup() {
-            ${script.replace(/<script[^>]*>|<\/script>/g, '')}
+    var app = createApp({
+        setup: function() {
+            ${script}
             return {};
         }
     });
     app.mount('#app');
 } catch (error) {
     document.getElementById('app').innerHTML = '<div style="padding:20px;color:red;">Error: ' + error.message + '</div>';
-    console.error('Vue error:', error);
 }
 </script>
 </body>
