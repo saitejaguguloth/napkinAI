@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { IconSend } from "./StudioIcons";
 import { StudioConfig } from "./SuggestionsPanel";
+import VoiceInput from "./VoiceInput";
 
 interface ModifyMessage {
     id: string;
     type: "user" | "ai" | "system";
     content: string;
     timestamp: Date;
+    isVoice?: boolean;
 }
 
 interface ModifyChatProps {
@@ -51,6 +53,15 @@ function generateResponse(command: string): string {
     if (lowerCmd.includes("contrast")) {
         return "Increasing contrast. Regenerating...";
     }
+    if (lowerCmd.includes("blue")) {
+        return "Making elements blue. Regenerating...";
+    }
+    if (lowerCmd.includes("header") || lowerCmd.includes("hero")) {
+        return "Adding header section. Regenerating...";
+    }
+    if (lowerCmd.includes("modern")) {
+        return "Making design more modern. Regenerating...";
+    }
 
     return "Applying modifications. Regenerating...";
 }
@@ -63,6 +74,7 @@ export default function ModifyChat({
     onHistoryUpdate,
 }: ModifyChatProps) {
     const [input, setInput] = useState("");
+    const [inputMode, setInputMode] = useState<"text" | "voice">("text");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const prevProcessingRef = useRef(isProcessing);
 
@@ -90,10 +102,12 @@ export default function ModifyChat({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isProcessing) return;
-
-        const command = input.trim();
+        processCommand(input.trim());
         setInput("");
+    };
+
+    const processCommand = (command: string, isVoice = false) => {
+        if (!command || isProcessing) return;
 
         // Add user message
         const userMessage: ModifyMessage = {
@@ -101,6 +115,7 @@ export default function ModifyChat({
             type: "user",
             content: command,
             timestamp: new Date(),
+            isVoice,
         };
 
         // Generate AI response
@@ -119,6 +134,10 @@ export default function ModifyChat({
         onModify(command);
     };
 
+    const handleVoiceCommand = (command: string) => {
+        processCommand(command, true);
+    };
+
     // Quick modification suggestions
     const QUICK_COMMANDS = [
         "Switch to sidebar navigation",
@@ -130,10 +149,28 @@ export default function ModifyChat({
 
     return (
         <div className="h-full flex flex-col">
-            {/* Header */}
-            <div className="h-12 flex-shrink-0 flex items-center px-4 border-b border-white/[0.06]">
-                <div>
-                    <h2 className="text-sm font-medium text-white">Modify with AI</h2>
+            {/* Header with mode toggle */}
+            <div className="h-12 flex-shrink-0 flex items-center justify-between px-4 border-b border-white/[0.06]">
+                <h2 className="text-sm font-medium text-white">Modify with AI</h2>
+                <div className="flex items-center gap-1 bg-white/5 rounded-lg p-0.5">
+                    <button
+                        onClick={() => setInputMode("text")}
+                        className={`px-2.5 py-1 rounded text-xs transition-all ${inputMode === "text"
+                                ? "bg-white/10 text-white"
+                                : "text-white/50 hover:text-white/70"
+                            }`}
+                    >
+                        Text
+                    </button>
+                    <button
+                        onClick={() => setInputMode("voice")}
+                        className={`px-2.5 py-1 rounded text-xs transition-all flex items-center gap-1 ${inputMode === "voice"
+                                ? "bg-white/10 text-white"
+                                : "text-white/50 hover:text-white/70"
+                            }`}
+                    >
+                        🎤 Voice
+                    </button>
                 </div>
             </div>
 
@@ -179,10 +216,13 @@ export default function ModifyChat({
                             className={msg.type === "user" ? "text-right" : "text-left"}
                         >
                             <div className={`inline-block max-w-[85%] px-3 py-2 rounded-lg ${msg.type === "user"
-                                    ? "bg-white/10 text-white/90"
-                                    : "bg-white/[0.03] text-white/60"
+                                ? "bg-white/10 text-white/90"
+                                : "bg-white/[0.03] text-white/60"
                                 }`}>
-                                <p className="text-sm">{msg.content}</p>
+                                {msg.isVoice && (
+                                    <span className="text-xs mr-1">🎤</span>
+                                )}
+                                <p className="text-sm inline">{msg.content}</p>
                             </div>
                         </motion.div>
                     ))
@@ -190,33 +230,57 @@ export default function ModifyChat({
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
+            {/* Input Area - Text or Voice */}
             <div className="flex-shrink-0 p-4 border-t border-white/[0.06]">
-                <form onSubmit={handleSubmit} className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        disabled={isProcessing}
-                        placeholder="Describe changes..."
-                        className="flex-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20 disabled:opacity-50"
-                    />
-                    <button
-                        type="submit"
-                        disabled={!input.trim() || isProcessing}
-                        className="p-2 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                    >
-                        {isProcessing ? (
-                            <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                <AnimatePresence mode="wait">
+                    {inputMode === "text" ? (
+                        <motion.form
+                            key="text-input"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            onSubmit={handleSubmit}
+                            className="flex items-center gap-2"
+                        >
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                disabled={isProcessing}
+                                placeholder="Describe changes..."
+                                className="flex-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20 disabled:opacity-50"
                             />
-                        ) : (
-                            <IconSend size={16} />
-                        )}
-                    </button>
-                </form>
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isProcessing}
+                                className="p-2 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            >
+                                {isProcessing ? (
+                                    <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                        className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                                    />
+                                ) : (
+                                    <IconSend size={16} />
+                                )}
+                            </button>
+                        </motion.form>
+                    ) : (
+                        <motion.div
+                            key="voice-input"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                        >
+                            <VoiceInput
+                                onCommand={handleVoiceCommand}
+                                isProcessing={isProcessing}
+                                disabled={isProcessing}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );
